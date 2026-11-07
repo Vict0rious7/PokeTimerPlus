@@ -42,6 +42,8 @@ namespace RngTypes
             // DS
             { "dppt-static", "ds", "DPPt Static", TimerTemplate::Gen4Delay, "dppt-static", one },
             { "dppt-wild", "ds", "DPPt Wild", TimerTemplate::Gen4Delay, "dppt-wild", one },
+            { "hgss-static", "ds", "HGSS Static", TimerTemplate::Gen4Delay, "hgss-static", one },
+            { "hgss-wild", "ds", "HGSS Wild", TimerTemplate::Gen4Delay, "hgss-wild", one },
             { "bw", "ds", "BW / B2W2", TimerTemplate::Gen5, "gen5", one },
             { "custom-ds", "ds", "Custom", TimerTemplate::Custom, "custom-ds", one },
             // 3DS, Switch: custom until those games are covered

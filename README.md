@@ -14,7 +14,7 @@
 
 **Organised by console and RNG type**
 - Tabs GB/GBA, DS, 3DS and Switch, each listing its RNG types, instead of Gen 3 / 4 / 5 tabs. Every tab has a Custom timer.
-- GB/GBA: RSE Wild, RSE Static, RSE Fishing, Emerald Egg and RS Egg (Held and Pickup sections, each with its own calibration; Emerald notes say which part decides what), FRLG Static, FRLG Wild, FRLG Egg (Held / Pickup). DS: DPPt Static, DPPt Wild, BW / B2W2 (Standard, C-Gear, Entralink, Entralink+).
+- GB/GBA: RSE Wild, RSE Static, RSE Fishing, Emerald Egg and RS Egg (Held and Pickup sections, each with its own calibration; Emerald notes say which part decides what), FRLG Static, FRLG Wild, FRLG Egg (Held / Pickup). DS: DPPt Static, DPPt Wild, HGSS Static, HGSS Wild, BW / B2W2 (Standard, C-Gear, Entralink, Entralink+).
 - **FRLG timer:** seed time (ms) plus target advance, each with its own calibration (ms and advances), matching how FRLG RNG is calibrated. Pairs with PokeFinderPlus' FRLG initial seed results.
 - "Played on" per console: GBA, GBA game on DS (slot 2), open_agb_firm, Game Boy Interface, Switch FR/LG, DS, 3DS native, 60 / 30 fps, or any custom frame rate. Rates not yet confirmed on hardware are marked.
 

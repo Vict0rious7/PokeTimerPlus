@@ -43,7 +43,7 @@ void StoreTest::catalog()
     }
     // Victor's list
     for (const char *id : { "rse-wild", "rse-static", "rse-fishing", "e-egg", "rs-egg", "frlg-static", "frlg-wild", "frlg-egg",
-                            "dppt-static", "dppt-wild", "bw" })
+                            "dppt-static", "dppt-wild", "hgss-static", "hgss-wild", "bw" })
     {
         QVERIFY2(RngTypes::find(id), id);
     }
@@ -51,6 +51,8 @@ void StoreTest::catalog()
     QVERIFY(RngTypes::find("e-egg")->sections.size() == 2);
     QVERIFY(keys.contains("e-egg/held") && keys.contains("e-egg/pickup") && keys.contains("frlg-egg/held"));
     QCOMPARE(RngTypes::find("bw")->calibrationKey, std::string("gen5")); // shared by all Gen 5
+    QVERIFY(RngTypes::find("hgss-static")->timer == TimerTemplate::Gen4Delay); // same timer as DPPt, own calibration
+    QVERIFY(RngTypes::find("hgss-wild")->calibrationKey != RngTypes::find("dppt-wild")->calibrationKey);
     QVERIFY(!RngTypes::find("e-egg")->sections[0].note.empty()); // the shiny / IV hint
 }
 
