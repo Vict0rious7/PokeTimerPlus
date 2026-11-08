@@ -33,7 +33,12 @@
 
 ## Download
 
-No release yet: builds of every push are on the [Actions page](https://github.com/Vict0rious7/PokeTimerPlus/actions) (open the latest green run → Artifacts, needs a GitHub login), or build it yourself.
+Get the latest version on the [Releases page](https://github.com/Vict0rious7/PokeTimerPlus/releases/latest), under **Assets**:
+
+- **Windows 10 / 11 (64-bit):** `PokeTimerPlus-windows.zip`. Unzip it, open the `PokeTimerPlus` folder, run `PokeTimerPlus.exe`. The app isn't signed, so Windows may show "Windows protected your PC": click **More info → Run anyway**. Nothing to install; the Visual C++ runtime is included.
+- **macOS (Intel or Apple Silicon):** `PokeTimerPlus-macos.zip`. Unzip, move `PokeTimerPlus.app` to Applications, right-click → **Open** the first time (not notarised).
+
+To be told about new versions: **Watch → Custom → Releases** at the top of this page. Builds of every push are also on the [Actions page](https://github.com/Vict0rious7/PokeTimerPlus/actions) (needs a GitHub login).
 
 ## Build on a Mac
 
@@ -45,9 +50,11 @@ With [Homebrew](https://brew.sh) installed, from this folder:
 ./build-mac.sh --clean   # start again from an empty build folder
 ```
 
+To publish a release: set `VERSION` in `CMakeLists.txt`, push, then push a tag `vX.Y.Z` with the same number (`vX.Y.Z-beta.1` makes a pre-release). CI builds Windows and macOS, starts the packaged Windows app once to check the zip, and attaches both zips to the release.
+
 Windows and Linux: Qt 6.8 or newer, CMake and Ninja, then `cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release` and `cmake --build build` (the CI workflow in `.github/workflows/ci.yaml` does exactly this on all three systems).
 
-Saved calibrations: `~/Library/Application Support/PokeTimerPlus/PokeTimerPlus/calibrations.json`.
+Saved calibrations: `~/Library/Application Support/PokeTimerPlus/PokeTimerPlus/calibrations.json` on macOS, `%APPDATA%\PokeTimerPlus\PokeTimerPlus\calibrations.json` on Windows.
 
 ## Code layout (same as PokeFinder)
 

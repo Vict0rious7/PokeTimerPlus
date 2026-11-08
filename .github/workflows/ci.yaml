@@ -1,7 +1,9 @@
 name: CI
 
 # Build and test PokeTimerPlus on Windows, Ubuntu and macOS (adapted from PokeFinderPlus's matrix-os.yaml).
-# Tags vX.Y.Z also publish a GitHub release with the Windows and macOS builds.
+# A tag vX.Y.Z (or vX.Y.Z-beta.1, published as a pre-release) also publishes a GitHub release with
+# PokeTimerPlus-windows.zip and PokeTimerPlus-macos.zip, named like EonTimer's release assets.
+# The tag must match `project(... VERSION X.Y.Z)` in CMakeLists.txt.
 
 on:
   push:
@@ -9,9 +11,13 @@ on:
       - "main"
       - "feature/**"
     tags:
-      - "v[0-9]+\\.[0-9]+\\.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   ci:
@@ -42,6 +48,19 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Check the tag matches the CMake version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          tag="${tag%%-*}"
+          version=$(sed -n 's/^project(PokeTimerPlus VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          echo "Tag $GITHUB_REF_NAME, CMakeLists.txt version $version"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match VERSION $version in CMakeLists.txt (the About box shows the CMake version)."
+            exit 1
+          fi
 
       - name: Install Ninja (Windows)
         if: matrix.platform-name == 'Windows'
@@ -94,36 +113,97 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
 
+      # The zip must run on a PC without Qt or Visual Studio: Qt DLLs and plugins from windeployqt,
+      # and the Visual C++ runtime DLLs copied next to the .exe (app-local, so no vc_redist install).
       - name: Package (Windows)
         if: matrix.platform-name == 'Windows'
+        shell: pwsh
         run: |
-          mkdir PokeTimerPlus
-          mv build/PokeTimerPlus.exe PokeTimerPlus/
-          windeployqt --no-translations --no-opengl-sw --no-system-d3d-compiler PokeTimerPlus/PokeTimerPlus.exe
-          rm -Force PokeTimerPlus/vc_redist*.exe -ErrorAction SilentlyContinue
-          7z a PokeTimerPlus-win.zip PokeTimerPlus
-          mkdir upload
-          mv PokeTimerPlus upload
+          New-Item -ItemType Directory PokeTimerPlus | Out-Null
+          Move-Item build/PokeTimerPlus.exe PokeTimerPlus/
+          windeployqt --release --no-translations --no-opengl-sw --no-system-d3d-compiler PokeTimerPlus/PokeTimerPlus.exe
+          Remove-Item PokeTimerPlus/vc_redist*.exe -ErrorAction SilentlyContinue
+          $crt = Get-ChildItem "$env:VCToolsRedistDir\x64" -Directory -Filter 'Microsoft.VC*.CRT' | Select-Object -First 1
+          if (-not $crt) { Write-Error "Visual C++ runtime not found under $env:VCToolsRedistDir"; exit 1 }
+          Copy-Item "$($crt.FullName)\*.dll" PokeTimerPlus/
+          Copy-Item LICENSE PokeTimerPlus/LICENSE.txt
+          Get-ChildItem -Recurse PokeTimerPlus | Select-Object -ExpandProperty FullName
+          New-Item -ItemType Directory dist | Out-Null
+          Compress-Archive -Path PokeTimerPlus -DestinationPath dist/PokeTimerPlus-windows.zip
 
+      # Start the packaged .exe the way a friend would: from the unzipped folder, with no Qt on PATH.
+      # It saves a screenshot after start-up and quits (POKETIMERPLUS_SCREENSHOT); no screenshot = broken zip.
+      - name: Smoke test the zip (Windows)
+        if: matrix.platform-name == 'Windows'
+        shell: pwsh
+        run: |
+          Expand-Archive dist/PokeTimerPlus-windows.zip -DestinationPath smoke
+          $env:PATH = "$env:SystemRoot\system32;$env:SystemRoot"
+          $env:POKETIMERPLUS_SCREENSHOT = "$PWD\smoke-windows.png"
+          $p = Start-Process -FilePath smoke/PokeTimerPlus/PokeTimerPlus.exe -PassThru
+          $null = $p.Handle  # keeps ExitCode readable after WaitForExit
+          if (-not $p.WaitForExit(60000)) { $p.Kill(); Write-Error "PokeTimerPlus did not quit within 60 s"; exit 1 }
+          if ($p.ExitCode -ne 0) { Write-Error "PokeTimerPlus exited with code $($p.ExitCode)"; exit 1 }
+          if (-not (Test-Path smoke-windows.png)) { Write-Error "No screenshot: the window did not come up"; exit 1 }
+          Write-Host "Packaged app started and saved its window."
+
+      - name: Upload smoke-test screenshot (Windows)
+        if: matrix.platform-name == 'Windows'
+        uses: actions/upload-artifact@v6
+        with:
+          name: smoke-windows
+          path: smoke-windows.png
+
+      # Ad-hoc signature so Apple Silicon Macs accept the bundle after macdeployqt changed it.
+      # ditto keeps the bundle's symlinks, which a plain zip would break.
       - name: Package (macOS)
         if: matrix.platform-name == 'macOS'
         run: |
           mv build/PokeTimerPlus.app .
           macdeployqt PokeTimerPlus.app
-          tar czf PokeTimerPlus-macOS.tar.gz PokeTimerPlus.app
-          mkdir upload && mv PokeTimerPlus.app upload
+          codesign --force --deep --sign - PokeTimerPlus.app
+          mkdir dist
+          ditto -c -k --sequesterRsrc --keepParent PokeTimerPlus.app dist/PokeTimerPlus-macos.zip
 
       - name: Upload artifact
         if: matrix.platform-name != 'Ubuntu'
         uses: actions/upload-artifact@v6
         with:
           name: PokeTimerPlus-${{ matrix.platform-name }}
-          path: upload
+          path: dist
+
+  # One job publishes the release once both builds passed (two matrix jobs writing the same release can race).
+  release:
+    name: Publish release
+    needs: ci
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download builds
+        uses: actions/download-artifact@v7
+        with:
+          pattern: PokeTimerPlus-*
+          path: dist
+          merge-multiple: true
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/') && matrix.platform-name != 'Ubuntu'
+        uses: softprops/action-gh-release@v3
         with:
+          name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
-            PokeTimerPlus-win.zip
-            PokeTimerPlus-macOS.tar.gz
+            dist/PokeTimerPlus-windows.zip
+            dist/PokeTimerPlus-macos.zip
+          body: |
+            ## Download
+
+            - **Windows (10 or 11, 64-bit):** `PokeTimerPlus-windows.zip` below. Unzip it anywhere (not inside the zip view) and run `PokeTimerPlus.exe` in the `PokeTimerPlus` folder. Windows may say "Windows protected your PC" because the app isn't signed: click **More info → Run anyway**.
+            - **macOS (Intel or Apple Silicon):** `PokeTimerPlus-macos.zip` below. Unzip, move `PokeTimerPlus.app` to Applications, then right-click it → **Open** the first time (the app isn't notarised).
+
+            Calibrations from EonTimer won't carry over exactly (the beeps reach the speaker sooner): calibrate once per RNG type, then **Save to profile**.
+            Bugs and questions: [issues](https://github.com/${{ github.repository }}/issues).
