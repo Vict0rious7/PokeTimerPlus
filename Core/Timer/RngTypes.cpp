@@ -52,15 +52,7 @@ namespace RngTypes
             { "bw", "ds", "BW / B2W2", TimerTemplate::Gen5, "gen5", one },
             { "custom-ds", "ds", "Custom", TimerTemplate::Custom, "custom-ds", one },
             // 3DS
-            { "xy-tid",
-              "3ds",
-              "XY TID",
-              TimerTemplate::XYTid,
-              "xy-tid",
-              { { "", "",
-                  "From PokeFinderPlus (Gen 6 → IDs). Runs at 59.8261 fps whatever \"Played on\" says, as 6genTidSearch does; "
-                  "the 3DS's exact rate isn't known, so prefer IDs a few minutes away over long waits. Method and timeline "
-                  "values: BZL's 6genTidSearch (blog.bzl-web.com/entry/2020/08/31/202306)." } } },
+            { "xy-tid", "3ds", "XY TID", TimerTemplate::XYTid, "xy-tid", one },
             { "custom-3ds", "3ds", "Custom", TimerTemplate::Custom, "custom-3ds", one },
             // Switch: custom until those games are covered
             { "custom-switch", "switch", "Custom", TimerTemplate::Custom, "custom-switch", one },

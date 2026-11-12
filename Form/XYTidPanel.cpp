@@ -15,10 +15,12 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QIntValidator>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QRegularExpression>
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QVBoxLayout>
@@ -29,10 +31,10 @@ namespace
 {
     // Scenes at which Space is pressed together with A (6genTidSearch's ステップ labels)
     const char *const stepNames[] = {
-        QT_TRANSLATE_NOOP("XYTidPanel", "1. Leave the professor's speech (A → gender screen)"),
-        QT_TRANSLATE_NOOP("XYTidPanel", "2. Open the name input screen (A)"),
-        QT_TRANSLATE_NOOP("XYTidPanel", "3. Name decided (OK)"),
-        QT_TRANSLATE_NOOP("XYTidPanel", "4. Name confirmed (Yes)"),
+        QT_TRANSLATE_NOOP("XYTidPanel", "1. Gender screen"),
+        QT_TRANSLATE_NOOP("XYTidPanel", "2. Name input screen"),
+        QT_TRANSLATE_NOOP("XYTidPanel", "3. Name decided"),
+        QT_TRANSLATE_NOOP("XYTidPanel", "4. Name confirmed"),
     };
 
     constexpr XYTid::u32 LIST_ROWS = 3000; // about an hour of IDs
@@ -55,16 +57,26 @@ XYTidPanel::XYTidPanel(QWidget *parent) : TimerPanel(parent)
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
 
-    auto *from = new QGroupBox(tr("From PokeFinderPlus (Gen 6 → IDs)"));
-    auto *fromLayout = new QHBoxLayout(from);
-    source_ = new QLabel(tr("Nothing yet: in PokeFinderPlus, pick an ID and press \"Send to PokeTimerPlus\"."));
-    source_->setObjectName("labelSource");
-    source_->setWordWrap(true);
+    auto *from = new QGroupBox(tr("Seed"));
+    auto *fromForm = new QFormLayout(from);
+    state_ = new QLineEdit;
+    state_->setObjectName("lineEditState");
+    state_->setPlaceholderText(tr("4 hex words"));
+    firstTap_ = new QLineEdit;
+    firstTap_->setObjectName("lineEditFirstTap");
+    firstTap_->setPlaceholderText(tr("HH:mm:ss.zzz"));
+    target_ = new QLineEdit;
+    target_->setObjectName("lineEditTarget");
+    target_->setPlaceholderText(tr("optional"));
+    target_->setValidator(new QIntValidator(0, 2147483647, target_));
     paste_ = new QPushButton(tr("Paste"));
     paste_->setObjectName("pushButtonPaste");
-    paste_->setToolTip(tr("Use \"Copy for PokeTimerPlus\" in PokeFinderPlus, then Paste here."));
-    fromLayout->addWidget(source_, 1);
-    fromLayout->addWidget(paste_);
+    auto *stateRow = new QHBoxLayout;
+    stateRow->addWidget(state_, 1);
+    stateRow->addWidget(paste_);
+    fromForm->addRow(tr("State at first tap"), stateRow);
+    fromForm->addRow(tr("First tap"), firstTap_);
+    fromForm->addRow(tr("Target advance"), target_);
     layout->addWidget(from);
 
     auto *run = new QGroupBox(tr("Opening"));
@@ -87,8 +99,6 @@ XYTidPanel::XYTidPanel(QWidget *parent) : TimerPanel(parent)
     faster_ = new QPushButton(tr("Faster"));
     slower_->setObjectName("pushButtonSlower");
     faster_->setObjectName("pushButtonFaster");
-    slower_->setToolTip(tr("The beep comes before the blink: one frame later"));
-    faster_->setToolTip(tr("The blink comes before the beep: one frame earlier"));
     offsetLabel_ = new QLabel;
     syncRow->addWidget(slower_);
     syncRow->addWidget(faster_);
@@ -120,18 +130,14 @@ XYTidPanel::XYTidPanel(QWidget *parent) : TimerPanel(parent)
     table_->setSelectionMode(QAbstractItemView::SingleSelection);
     table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table_->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-    table_->setToolTip(tr("After the 4th step: every ID you can still get, with the frames to wait from the 4th press. Pick one: "
-                          "the countdown aims at the middle of its window."));
     layout->addWidget(table_, 1);
 
     auto *cal = new QGroupBox(tr("Calibration"));
     auto *calForm = new QFormLayout(cal);
     pressMs_ = doubleSpin(tr(" ms"));
     pressMs_->setObjectName("doubleSpinBoxPressMs");
-    pressMs_->setToolTip(tr("Added to the A press. Update corrects it from the TID you got."));
     blinkOffset_ = spin(-600, 600, tr(" frames"));
     blinkOffset_->setObjectName("spinBoxBlinkOffset");
-    blinkOffset_->setToolTip(tr("Faster/Slower applied when the beeps start (Faster and Slower change it as you go)"));
     calForm->addRow(tr("A press"), pressMs_);
     calForm->addRow(tr("Blink offset"), blinkOffset_);
     tidHit_ = hitEdit(tr("TID you got"));
@@ -145,11 +151,11 @@ XYTidPanel::XYTidPanel(QWidget *parent) : TimerPanel(parent)
         auto h = XYTid::Handoff::fromString(QApplication::clipboard()->text().trimmed().toStdString());
         if (!h)
         {
-            emit message(tr("The clipboard doesn't hold PokeFinderPlus' XY TID details (\"Copy for PokeTimerPlus\")."));
+            emit message(tr("Nothing usable on the clipboard."));
         }
         else if (!load(*h))
         {
-            emit message(tr("Stop the running timeline first."));
+            emit message(tr("Stop first."));
         }
     });
     connect(faster_, &QPushButton::clicked, this, [this] {
@@ -223,19 +229,19 @@ bool XYTidPanel::calibrate(const Calibrator &)
     }
     if (best < 0 || aimIndex < 0)
     {
-        emit message(tr("TID %1 isn't near the target in the last list: no change.").arg(int(*tid)));
+        emit message(tr("TID %1 not near the target: no change.").arg(int(*tid)));
         return false;
     }
     tidHit_->clear();
     if (best == aimIndex)
     {
-        emit message(tr("That's the target: no change needed."));
+        emit message(tr("Target hit: no change."));
         return true;
     }
     const XYTid::Row &got = lastRows_[size_t(best)];
     const double error = (got.wait + got.window / 2.0) - (lastAim_->wait + lastAim_->window / 2.0); // frames, + = late
     pressMs_->setValue(pressMs_->value() - error * msPerFrame());
-    emit message(tr("You pressed about %1 frames %2. A press calibration: %3 ms.")
+    emit message(tr("%1 frames %2. A press: %3 ms.")
                      .arg(std::abs(error), 0, 'f', 0)
                      .arg(error > 0 ? tr("late") : tr("early"))
                      .arg(pressMs_->value(), 0, 'f', 1));
@@ -245,6 +251,9 @@ bool XYTidPanel::calibrate(const Calibrator &)
 void XYTidPanel::setRunning(bool running)
 {
     paste_->setEnabled(!running);
+    state_->setEnabled(!running);
+    firstTap_->setEnabled(!running);
+    target_->setEnabled(!running);
     faster_->setEnabled(running);
     slower_->setEnabled(running);
     step_->setEnabled(running);
@@ -258,25 +267,9 @@ bool XYTidPanel::load(const XYTid::Handoff &handoff)
     {
         return false;
     }
-    handoff_ = handoff;
-    const qint64 ago = QDateTime::currentMSecsSinceEpoch() - handoff.tapEpochMs;
-    QString text = tr("%1 · first tap %2 (%3 ago)")
-                       .arg(QChar(handoff.game))
-                       .arg(QDateTime::fromMSecsSinceEpoch(handoff.tapEpochMs).toString("HH:mm:ss.zzz"))
-                       .arg(minutes(double(ago)));
-    if (handoff.target)
-    {
-        text += tr(" · target advance %1").arg(*handoff.target);
-        if (handoff.tid && handoff.sid)
-        {
-            text += tr(" = TID %1 / SID %2").arg(*handoff.tid).arg(*handoff.sid);
-        }
-    }
-    else
-    {
-        text += tr(" · no target (pick it in the list after step 4)");
-    }
-    source_->setText(text);
+    state_->setText(QString::asprintf("%08X,%08X,%08X,%08X", handoff.state[3], handoff.state[2], handoff.state[1], handoff.state[0]));
+    firstTap_->setText(QDateTime::fromMSecsSinceEpoch(handoff.tapEpochMs).toString("HH:mm:ss.zzz"));
+    target_->setText(handoff.target ? QString::number(*handoff.target) : QString());
     table_->setRowCount(0);
     rows_.clear();
     chosen_ = -1;
@@ -284,9 +277,50 @@ bool XYTidPanel::load(const XYTid::Handoff &handoff)
     return true;
 }
 
+std::optional<XYTid::Handoff> XYTidPanel::fields() const
+{
+    XYTid::Handoff h;
+    const QStringList words = state_->text().split(QRegularExpression("[\\s,]+"), Qt::SkipEmptyParts);
+    if (words.size() != 4)
+    {
+        return std::nullopt;
+    }
+    for (int i = 0; i < 4; i++)
+    {
+        bool ok;
+        h.state[size_t(3 - i)] = words[i].toUInt(&ok, 16);
+        if (!ok)
+        {
+            return std::nullopt;
+        }
+    }
+    QTime time = QTime::fromString(firstTap_->text().trimmed(), "HH:mm:ss.zzz");
+    if (!time.isValid())
+    {
+        time = QTime::fromString(firstTap_->text().trimmed(), "HH:mm:ss");
+    }
+    if (!time.isValid())
+    {
+        return std::nullopt;
+    }
+    QDateTime tap(QDate::currentDate(), time);
+    if (tap > QDateTime::currentDateTime())
+    {
+        tap = tap.addDays(-1); // tapped before midnight
+    }
+    h.tapEpochMs = tap.toMSecsSinceEpoch();
+    bool ok;
+    const uint target = target_->text().toUInt(&ok);
+    if (ok)
+    {
+        h.target = target;
+    }
+    return h;
+}
+
 bool XYTidPanel::hasHandoff() const
 {
-    return handoff_.has_value();
+    return fields().has_value();
 }
 
 bool XYTidPanel::isSessionRunning() const
@@ -306,6 +340,7 @@ XYTid::u32 XYTidPanel::frameAt(double ms) const
 
 void XYTidPanel::startSession(double nowMs)
 {
+    handoff_ = fields();
     if (!handoff_)
     {
         return;
@@ -326,8 +361,7 @@ void XYTidPanel::startSession(double nowMs)
     }
     if (elapsed > 3 * 3600000.0)
     {
-        emit message(
-            tr("The first tap was %1 h ago: was the game reset since? Tap and search again if so.").arg(elapsed / 3600000.0, 0, 'f', 1));
+        emit message(tr("First tap %1 h ago.").arg(elapsed / 3600000.0, 0, 'f', 1));
     }
     updateStepLabel();
     refreshBeeps(nowMs);
@@ -500,8 +534,8 @@ void XYTidPanel::refreshList()
         if (target < 0)
         {
             emit message(rows_.empty() || *handoff_->target < rows_.front().advance
-                             ? tr("Advance %1 has already passed: pick another ID in the list.").arg(*handoff_->target)
-                             : tr("Advance %1 is taken by a blink (no ID there): pick another ID in the list.").arg(*handoff_->target));
+                             ? tr("Advance %1 has passed.").arg(*handoff_->target)
+                             : tr("Advance %1 isn't reachable.").arg(*handoff_->target));
         }
         else
         {
@@ -511,7 +545,7 @@ void XYTidPanel::refreshList()
     }
     else
     {
-        emit message(tr("Pick the ID you want in the list."));
+        emit message(tr("Pick an ID."));
     }
 }
 
@@ -525,7 +559,7 @@ void XYTidPanel::chooseRow(int row)
     const double now = startMs_ + session_->getFrame() * msPerFrame();
     if (aimMs(rows_[size_t(row)]) < now + lead)
     {
-        emit message(tr("Too soon for a countdown: pick a later ID."));
+        emit message(tr("Too soon: pick a later ID."));
         return;
     }
     chosen_ = row;
@@ -538,11 +572,11 @@ void XYTidPanel::updateStepLabel()
 {
     if (!session_)
     {
-        stepLabel_->setText(handoff_ ? tr("Start (Space) on the professor's blinking screen") : tr("Waiting for PokeFinderPlus"));
+        stepLabel_->setText(tr("Start"));
         offsetLabel_->clear();
         return;
     }
     const int done = session_->getSteps();
-    stepLabel_->setText(done < 4 ? tr(stepNames[done]) : tr("Done: wait for the countdown, A on the last beep"));
-    offsetLabel_->setText(nudges_ == 0 ? QString() : tr("%1%2 frames this time").arg(nudges_ > 0 ? "+" : "").arg(nudges_));
+    stepLabel_->setText(done < 4 ? tr(stepNames[done]) : tr("Countdown"));
+    offsetLabel_->setText(nudges_ == 0 ? QString() : QStringLiteral("%1%2 f").arg(nudges_ > 0 ? "+" : "").arg(nudges_));
 }

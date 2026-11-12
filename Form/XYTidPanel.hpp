@@ -34,7 +34,7 @@ public:
     bool calibrate(const Calibrator &calibrator) override; // from the TID you got
     void setRunning(bool running) override;
 
-    /// What PokeFinderPlus sent; replaces any previous one (not while a session runs)
+    /// Fills the Seed fields with what PokeFinderPlus sent (not while a session runs)
     bool load(const XYTid::Handoff &handoff);
     bool hasHandoff() const;
     bool isSessionRunning() const;
@@ -68,9 +68,10 @@ private:
     void updateStepLabel();
     void chooseRow(int row);
     double aimMs(const XYTid::Row &row) const;
+    std::optional<XYTid::Handoff> fields() const; // from the Seed fields
 
     // UI
-    QLabel *source_;
+    QLineEdit *state_, *firstTap_, *target_;
     QPushButton *paste_;
     QRadioButton *boy_, *girl_;
     QPushButton *faster_, *slower_;

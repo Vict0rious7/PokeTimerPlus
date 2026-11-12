@@ -589,7 +589,7 @@ void MainWindow::startStop()
     {
         if (!xy->hasHandoff())
         {
-            statusBar()->showMessage(tr("Send an ID from PokeFinderPlus first (Gen 6 → IDs), or Paste its details."), 6000);
+            statusBar()->showMessage(tr("Fill in the state and the first tap."), 6000);
             return;
         }
         controller_->startExternal();
@@ -769,8 +769,6 @@ QByteArray MainWindow::receiveHandoff(const QByteArray &line)
     startStop(); // the blink beeps start at once: you are on the professor's screen
     raise();
     activateWindow();
-    statusBar()->showMessage(
-        tr("From PokeFinderPlus: beeps on the professor's blinks. Faster/Slower until they match, then Space with A at each step."), 15000);
     return "OK";
 }
 
