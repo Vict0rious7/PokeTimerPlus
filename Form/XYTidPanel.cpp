@@ -31,10 +31,10 @@ namespace
 {
     // Scenes at which Space is pressed together with A (6genTidSearch's ステップ labels)
     const char *const stepNames[] = {
-        QT_TRANSLATE_NOOP("XYTidPanel", "1. Gender screen"),
-        QT_TRANSLATE_NOOP("XYTidPanel", "2. Name input screen"),
-        QT_TRANSLATE_NOOP("XYTidPanel", "3. Name decided"),
-        QT_TRANSLATE_NOOP("XYTidPanel", "4. Name confirmed"),
+        QT_TRANSLATE_NOOP("XYTidPanel", "1. Professor blinking screen"),
+        QT_TRANSLATE_NOOP("XYTidPanel", "2. \"Tell me your name?\""),
+        QT_TRANSLATE_NOOP("XYTidPanel", "3. Name entered"),
+        QT_TRANSLATE_NOOP("XYTidPanel", "4. Name right? \"Yes\""),
     };
 
     constexpr XYTid::u32 LIST_ROWS = 3000; // about an hour of IDs
