@@ -16,6 +16,7 @@
 - Tabs GB/GBA, DS, 3DS and Switch, each listing its RNG types, instead of Gen 3 / 4 / 5 tabs. Every tab has a Custom timer.
 - GB/GBA: RSE Wild, RSE Static, RSE Fishing, Emerald Egg and RS Egg (Held and Pickup sections, each with its own calibration; Emerald notes say which part decides what), FRLG Static, FRLG Wild, FRLG Egg (Held / Pickup). DS: DPPt Static, DPPt Wild, HGSS Static, HGSS Wild, BW / B2W2 (Standard, C-Gear, Entralink, Entralink+).
 - **FRLG timer:** seed time (ms) plus target advance, each with its own calibration (ms and advances), matching how FRLG RNG is calibrated. Pairs with PokeFinderPlus' FRLG initial seed results.
+- **3DS → XY TID** (Trainer ID / Secret ID in X and Y, BZL's 6genTidSearch method): fed by PokeFinderPlus' Gen 6 → IDs window ("Send to PokeTimerPlus", or Copy + Paste). It beeps on the professor's blinks (Faster / Slower to line them up), takes **Space with A** at each of the 4 scenes (no global hotkey: everything is in one app), then lists every ID you can still get with the frames to wait, and counts down to the A press for the one you pick (aiming at the middle of its window). Update corrects the A press from the TID you got. Checked against 6genTidSearch's own code.
 - "Played on" per console: GBA, GBA game on DS (slot 2), open_agb_firm, Game Boy Interface, Switch FR/LG, DS, 3DS native, 60 / 30 fps, or any custom frame rate. Rates not yet confirmed on hardware are marked.
 
 **Saved calibrations**
@@ -61,6 +62,7 @@ Saved calibrations: `~/Library/Application Support/PokeTimerPlus/PokeTimerPlus/c
 - `Core/` (no Qt)
   - `Timer/`: frame rates, EonTimer's timer maths, beep schedule (with flowing targets).
   - `Audio/`: the output stream (miniaudio, always open) and `BeepMixer` (beeps at exact sample positions, stalls and clock drift corrected).
+  - `Gen6/XYTid`: XY TID blink timeline (identical copy of PokeFinderPlus' file).
   - `Timer/RngTypes`: the RNG types per console tab (GB/GBA, DS, 3DS, Switch) and the frame rates each console offers.
   - `Profile/`: saved calibrations ("Save to profile"), one per RNG type / egg section, JSON.
 - `Form/`: the window (Qt Widgets, Fusion, like PokeFinderPlus): console tabs, RNG list, one panel per timer template, timer; EonTimer's beep sounds.
@@ -80,3 +82,4 @@ GPL-3.0 (see `LICENSE`), like PokeFinderPlus.
 - Flowing targets and the always-open audio stream: ideas from [FlowTimer](https://github.com/stringflow/FlowTimer) by stringflow (no code copied).
 - Stall and drift correction: approach of [Mystic Timer](https://github.com/zaksabeast/PokemonRNGGuides) (pokemonrng.com).
 - Audio: [miniaudio](https://miniaud.io) (licence in `Core/External/miniaudio/LICENSE`).
+- XY TID: method and timeline values from 6genTidSearch by BZL (なるほどえたきちのブログじゃねーの), used with his permission: [XY guide](https://blog.bzl-web.com/entry/2020/08/31/202306), [ORAS guide](https://blog.bzl-web.com/entry/2020/08/24/225424). `Core/Gen6/XYTid` is shared with PokeFinderPlus and checked against 6genTidSearch's own code (`Test/Resources/xytid_6gentidsearch.json`, made by PokeFinderPlus' `Test/Gen6/golden6tid`).

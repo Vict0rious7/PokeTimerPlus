@@ -18,12 +18,15 @@ class QComboBox;
 class QDoubleSpinBox;
 class QLabel;
 class QListWidget;
+class QLocalServer;
+class QLocalSocket;
 class QPushButton;
 class QStackedWidget;
 class QTabBar;
 class TimerController;
 class TimerDisplay;
 class TimerPanel;
+class XYTidPanel;
 
 class MainWindow : public QMainWindow
 {
@@ -51,6 +54,11 @@ private:
     void updateNote();
     void updatePreview();
     void startStop();
+    void spacePressed(); // Start/Stop, or the next step of a running XY TID
+    void setRunningUi(bool running);
+    XYTidPanel *xyPanel() const; // the current panel if it is XY TID
+    void listen(); // PokeFinderPlus' "Send to PokeTimerPlus"
+    QByteArray receiveHandoff(const QByteArray &line);
     void calibrate();
     void setTarget();
     void finished();
@@ -83,6 +91,7 @@ private:
     QPushButton *updateButton_;
     QPushButton *startButton_;
     QLabel *outputLabel_;
+    QLocalServer *server_ = nullptr;
 };
 
 #endif // MAINWINDOW_HPP

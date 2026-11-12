@@ -10,6 +10,8 @@ add_library(PokeTimerPlusCore STATIC
     Audio/Wav.cpp
     Audio/Wav.hpp
     Audio/miniaudio_impl.c
+    Gen6/XYTid.cpp
+    Gen6/XYTid.hpp
     Profile/CalibrationStore.cpp
     Profile/CalibrationStore.hpp
     Timer/Calibrator.cpp

@@ -130,6 +130,32 @@ void TimerController::startContinuous()
     tick();
 }
 
+void TimerController::startExternal()
+{
+    startMs_ = Clock::nowMs();
+    external_ = true;
+    externalBeeps_.clear();
+    schedule_.reset();
+    pushSchedule();
+    timer_->start();
+    tick();
+}
+
+bool TimerController::isExternal() const
+{
+    return external_;
+}
+
+void TimerController::setExternalBeeps(const std::vector<double> &absoluteMs)
+{
+    if (!external_)
+    {
+        return;
+    }
+    externalBeeps_ = absoluteMs;
+    pushSchedule();
+}
+
 bool TimerController::isContinuous() const
 {
     return continuous_;
@@ -173,6 +199,8 @@ void TimerController::stop()
 {
     timer_->stop();
     continuous_ = false;
+    external_ = false;
+    externalBeeps_.clear();
     targets_.clear();
     schedule_.reset();
     visualBeeps_.clear();
@@ -181,7 +209,7 @@ void TimerController::stop()
 
 bool TimerController::isRunning() const
 {
-    return schedule_ != nullptr || continuous_;
+    return schedule_ != nullptr || continuous_ || external_;
 }
 
 bool TimerController::setPhase(int phase, double durationMs)
@@ -204,6 +232,16 @@ void TimerController::pushSchedule()
     if (schedule_)
     {
         beeps = schedule_->beepsAfter(elapsed - 5);
+    }
+    else if (external_)
+    {
+        for (double t : externalBeeps_)
+        {
+            if (t > startMs_ + elapsed - 5)
+            {
+                beeps.push_back(Beep { t - startMs_, 0, 0 });
+            }
+        }
     }
     else if (continuous_)
     {
@@ -245,7 +283,7 @@ int TimerController::slipCount() const
 
 void TimerController::tick()
 {
-    if (!schedule_ && !continuous_)
+    if (!schedule_ && !continuous_ && !external_)
     {
         return;
     }
@@ -259,6 +297,12 @@ void TimerController::tick()
         {
             emit beep();
         }
+    }
+
+    if (external_)
+    {
+        emit externalTick(now, elapsed);
+        return;
     }
 
     if (continuous_)

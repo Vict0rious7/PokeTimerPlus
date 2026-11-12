@@ -101,6 +101,13 @@ void TimerDisplay::showContinuous(double elapsed, double toNext, int targetsLeft
     }
 }
 
+void TimerDisplay::showLabelled(const QString &label, double remaining, double elapsed)
+{
+    phase_->setText(label);
+    current_->setText(format(remaining));
+    next_->setText(std::isnan(elapsed) ? QString() : tr("Elapsed: %1").arg(format(elapsed)));
+}
+
 void TimerDisplay::setMinutesBefore(int minutes)
 {
     minutes_->setVisible(minutes >= 0);

@@ -37,7 +37,12 @@ namespace RngTypes
             { "rs-egg", "gba", "RS Egg", TimerTemplate::Gen3Frames, "rs-egg", { { "held", "Held", "" }, { "pickup", "Pickup", "" } } },
             { "frlg-static", "gba", "FRLG Static", TimerTemplate::SeedAdvances, "frlg-static", one },
             { "frlg-wild", "gba", "FRLG Wild", TimerTemplate::SeedAdvances, "frlg-wild", one },
-            { "frlg-egg", "gba", "FRLG Egg", TimerTemplate::SeedAdvances, "frlg-egg", { { "held", "Held", "" }, { "pickup", "Pickup", "" } } },
+            { "frlg-egg",
+              "gba",
+              "FRLG Egg",
+              TimerTemplate::SeedAdvances,
+              "frlg-egg",
+              { { "held", "Held", "" }, { "pickup", "Pickup", "" } } },
             { "custom-gba", "gba", "Custom", TimerTemplate::Custom, "custom-gba", one },
             // DS
             { "dppt-static", "ds", "DPPt Static", TimerTemplate::Gen4Delay, "dppt-static", one },
@@ -46,8 +51,18 @@ namespace RngTypes
             { "hgss-wild", "ds", "HGSS Wild", TimerTemplate::Gen4Delay, "hgss-wild", one },
             { "bw", "ds", "BW / B2W2", TimerTemplate::Gen5, "gen5", one },
             { "custom-ds", "ds", "Custom", TimerTemplate::Custom, "custom-ds", one },
-            // 3DS, Switch: custom until those games are covered
+            // 3DS
+            { "xy-tid",
+              "3ds",
+              "XY TID",
+              TimerTemplate::XYTid,
+              "xy-tid",
+              { { "", "",
+                  "From PokeFinderPlus (Gen 6 → IDs). Runs at 59.8261 fps whatever \"Played on\" says, as 6genTidSearch does; "
+                  "the 3DS's exact rate isn't known, so prefer IDs a few minutes away over long waits. Method and timeline "
+                  "values: BZL's 6genTidSearch (blog.bzl-web.com/entry/2020/08/31/202306)." } } },
             { "custom-3ds", "3ds", "Custom", TimerTemplate::Custom, "custom-3ds", one },
+            // Switch: custom until those games are covered
             { "custom-switch", "switch", "Custom", TimerTemplate::Custom, "custom-switch", one },
         };
         return list;

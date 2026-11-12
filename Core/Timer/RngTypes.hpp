@@ -18,7 +18,8 @@ enum class TimerTemplate
     SeedAdvances, // FRLG: initial seed time (ms) + advances, each with its own calibration
     Gen4Delay, // EonTimer Gen 4: target delay + second, calibrated delay + second
     Gen5, // EonTimer Gen 5 modes
-    Custom // free phases, or continuous (targets added while the timer runs)
+    Custom, // free phases, or continuous (targets added while the timer runs)
+    XYTid // XY Trainer ID: blink timeline + wait after the 4th step (6genTidSearch method), fed by PokeFinderPlus
 };
 
 struct RngSection

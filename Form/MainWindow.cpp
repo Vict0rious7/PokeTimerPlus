@@ -7,8 +7,11 @@
 #include "TimerController.hpp"
 #include "TimerDisplay.hpp"
 #include "TimerPanels.hpp"
+#include "XYTidPanel.hpp"
 #include <AppVersion.hpp>
+#include <Core/Gen6/XYTid.hpp>
 #include <Core/Timer/FrameRate.hpp>
+#include <Core/Util/Clock.hpp>
 #include <QApplication>
 #include <QCloseEvent>
 #include <QComboBox>
@@ -18,6 +21,8 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
+#include <QLocalServer>
+#include <QLocalSocket>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPushButton>
@@ -95,6 +100,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), controller_(new T
     connect(controller_, &TimerController::continuousProgress, display_, &TimerDisplay::showContinuous);
     connect(controller_, &TimerController::beep, display_, &TimerDisplay::flash);
     connect(controller_, &TimerController::finished, this, &MainWindow::finished);
+    connect(controller_, &TimerController::externalTick, this, [this](double now, double) {
+        if (XYTidPanel *xy = xyPanel())
+        {
+            xy->tick(now);
+        }
+    });
 
     QSettings s;
     restoreGeometry(s.value("geometry").toByteArray());
@@ -102,13 +113,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), controller_(new T
     consoles_->setCurrentIndex(consoleIndex);
     selectConsole(consoleIndex);
     outputChanged();
+    listen();
 }
 
 MainWindow::~MainWindow() = default;
 
 void MainWindow::buildUi()
 {
-    auto *settingsAction = menuBar()->addMenu(tr("&File"))->addAction(tr("Settings…"), QKeySequence::Preferences, this, &MainWindow::openSettings);
+    auto *settingsAction
+        = menuBar()->addMenu(tr("&File"))->addAction(tr("Settings…"), QKeySequence::Preferences, this, &MainWindow::openSettings);
     settingsAction->setMenuRole(QAction::PreferencesRole);
     auto *about = menuBar()->addMenu(tr("&Help"))->addAction(tr("About PokeTimerPlus"));
     about->setMenuRole(QAction::AboutRole);
@@ -116,7 +129,10 @@ void MainWindow::buildUi()
         QMessageBox::about(this, tr("About PokeTimerPlus"),
                            tr("<b>PokeTimerPlus %1</b><br>All-in-one RNG timer.<br><br>Timer maths ported from EonTimer by DasAmpharos "
                               "(MIT). Continuous targets after FlowTimer by stringflow. Audio by miniaudio (public domain). Beep sounds "
-                              "from EonTimer.")
+                              "from EonTimer.<br><br>XY TID: method and timeline values by BZL, from 6genTidSearch, used with his "
+                              "permission (なるほどえたきちのブログじゃねーの, "
+                              "<a href=\"https://blog.bzl-web.com/entry/2020/08/31/202306\">XY</a>, "
+                              "<a href=\"https://blog.bzl-web.com/entry/2020/08/24/225424\">ORAS</a>).")
                                .arg(QStringLiteral(POKETIMERPLUS_VERSION)));
     });
 
@@ -216,11 +232,10 @@ void MainWindow::buildUi()
     connect(saveButton_, &QPushButton::clicked, this, &MainWindow::saveCalibration);
     connect(updateButton_, &QPushButton::clicked, this, &MainWindow::calibrate);
     connect(startButton_, &QPushButton::clicked, this, &MainWindow::startStop);
-    for (const QKeySequence &key : { QKeySequence(Qt::Key_Space), QKeySequence(Qt::CTRL | Qt::Key_Return) })
-    {
-        auto *shortcut = new QShortcut(key, this);
-        connect(shortcut, &QShortcut::activated, this, &MainWindow::startStop);
-    }
+    auto *space = new QShortcut(QKeySequence(Qt::Key_Space), this);
+    connect(space, &QShortcut::activated, this, &MainWindow::spacePressed);
+    auto *ctrlReturn = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), this);
+    connect(ctrlReturn, &QShortcut::activated, this, &MainWindow::startStop);
 
     setCentralWidget(central);
     resize(1080, 560);
@@ -321,6 +336,15 @@ TimerPanel *MainWindow::panelFor(const RngType &type)
         updateSaveState();
     });
     connect(p, &TimerPanel::setTargetRequested, this, &MainWindow::setTarget);
+    if (auto *xy = qobject_cast<XYTidPanel *>(p))
+    {
+        xy->setCountdown(settings_.beepCount, settings_.beepIntervalMs);
+        connect(xy, &XYTidPanel::beepsChanged, controller_, &TimerController::setExternalBeeps);
+        connect(xy, &XYTidPanel::message, this, [this](const QString &text) { statusBar()->showMessage(text, 10000); });
+        connect(xy, &XYTidPanel::countdown, this, [this](double remaining, const QString &label) {
+            display_->showLabelled(label, remaining, std::numeric_limits<double>::quiet_NaN());
+        });
+    }
     if (auto *custom = qobject_cast<CustomPanel *>(p))
     {
         connect(custom, &TimerPanel::addTargetRequested, this, [this, custom](double value, bool frames) {
@@ -440,8 +464,8 @@ void MainWindow::updateSaveState()
         bool samePhases = phases != store_.customPhases.end() && phases->second.size() == mine.size();
         for (size_t i = 0; samePhases && i < mine.size(); i++)
         {
-            samePhases = phases->second[i].unit == mine[i].unit && phases->second[i].target == mine[i].target &&
-                phases->second[i].calibration == mine[i].calibration;
+            samePhases = phases->second[i].unit == mine[i].unit && phases->second[i].target == mine[i].target
+                && phases->second[i].calibration == mine[i].calibration;
         }
         same = same && samePhases;
     }
@@ -513,6 +537,37 @@ void MainWindow::updatePreview()
     display_->setMinutesBefore(p->current()->minutesBefore(cal));
 }
 
+XYTidPanel *MainWindow::xyPanel() const
+{
+    TimerPanel *p = panel();
+    return p ? qobject_cast<XYTidPanel *>(p->current()) : nullptr;
+}
+
+void MainWindow::spacePressed()
+{
+    XYTidPanel *xy = xyPanel();
+    if (xy && xy->isSessionRunning())
+    {
+        xy->stepPressed(Clock::nowMs());
+        return;
+    }
+    startStop();
+}
+
+void MainWindow::setRunningUi(bool running)
+{
+    startButton_->setText(running ? tr("Stop") : tr("Start"));
+    consoles_->setEnabled(!running);
+    types_->setEnabled(!running);
+    hardware_->setEnabled(!running);
+    customFps_->setEnabled(!running);
+    updateButton_->setEnabled(!running);
+    if (TimerPanel *p = panel())
+    {
+        p->setRunning(running);
+    }
+}
+
 void MainWindow::startStop()
 {
     TimerPanel *p = panel();
@@ -523,7 +578,28 @@ void MainWindow::startStop()
     if (controller_->isRunning())
     {
         controller_->stop();
+        if (XYTidPanel *xy = xyPanel())
+        {
+            xy->stopSession();
+        }
         finished();
+        return;
+    }
+    if (XYTidPanel *xy = xyPanel())
+    {
+        if (!xy->hasHandoff())
+        {
+            statusBar()->showMessage(tr("Send an ID from PokeFinderPlus first (Gen 6 → IDs), or Paste its details."), 6000);
+            return;
+        }
+        controller_->startExternal();
+        xy->startSession(Clock::nowMs());
+        setRunningUi(true);
+        // Space must reach the step, not a text field that had the focus
+        if (QWidget *focus = QApplication::focusWidget())
+        {
+            focus->clearFocus();
+        }
         return;
     }
     if (p->current()->isContinuous())
@@ -540,31 +616,16 @@ void MainWindow::startStop()
         }
         controller_->start(phases);
     }
-    startButton_->setText(tr("Stop"));
-    consoles_->setEnabled(false);
-    types_->setEnabled(false);
-    hardware_->setEnabled(false);
-    customFps_->setEnabled(false);
-    updateButton_->setEnabled(false);
-    p->setRunning(true);
+    setRunningUi(true);
 }
 
 void MainWindow::finished()
 {
-    startButton_->setText(tr("Start"));
-    consoles_->setEnabled(true);
-    types_->setEnabled(true);
-    hardware_->setEnabled(true);
-    customFps_->setEnabled(true);
-    updateButton_->setEnabled(true);
-    if (TimerPanel *p = panel())
-    {
-        p->setRunning(false);
-    }
+    setRunningUi(false);
     if (controller_->slipCount() > 0)
     {
-        statusBar()->showMessage(tr("The audio output stalled %n time(s); the beeps were put back on time.", nullptr, controller_->slipCount()),
-                                 8000);
+        statusBar()->showMessage(
+            tr("The audio output stalled %n time(s); the beeps were put back on time.", nullptr, controller_->slipCount()), 8000);
     }
     QTimer::singleShot(800, this, &MainWindow::updatePreview);
 }
@@ -600,6 +661,13 @@ void MainWindow::applySettings()
 {
     controller_->setSound(loadSound(settings_.sound));
     controller_->setBeeps(settings_.beepCount, settings_.beepIntervalMs);
+    for (const auto &[id, p] : panels_)
+    {
+        if (auto *xy = qobject_cast<XYTidPanel *>(p))
+        {
+            xy->setCountdown(settings_.beepCount, settings_.beepIntervalMs);
+        }
+    }
     controller_->setAudio(settings_.audio);
     controller_->setVisual(settings_.visual);
 }
@@ -631,8 +699,79 @@ void MainWindow::openSettings()
 void MainWindow::outputChanged()
 {
     const QString name = controller_->outputName();
-    outputLabel_->setText(tr("Output: %1  ·  %2 fps").arg(name.isEmpty() ? tr("none") : name, QLocale::c().toString(calibrator().msPerFrame() > 0 ? 1000.0 / calibrator().msPerFrame() : 0, 'f', 4)));
+    outputLabel_->setText(tr("Output: %1  ·  %2 fps")
+                              .arg(name.isEmpty() ? tr("none") : name,
+                                   QLocale::c().toString(calibrator().msPerFrame() > 0 ? 1000.0 / calibrator().msPerFrame() : 0, 'f', 4)));
     outputLabel_->setToolTip(controller_->outputDetails());
+}
+
+void MainWindow::listen()
+{
+    server_ = new QLocalServer(this);
+    server_->setSocketOptions(QLocalServer::UserAccessOption);
+    if (!server_->listen(QString::fromLatin1(XYTid::SOCKET_NAME)))
+    {
+        // A crashed instance can leave the socket file behind (Unix); a running one keeps it
+        QLocalSocket probe;
+        probe.connectToServer(QString::fromLatin1(XYTid::SOCKET_NAME));
+        if (!probe.waitForConnected(300))
+        {
+            QLocalServer::removeServer(QString::fromLatin1(XYTid::SOCKET_NAME));
+            server_->listen(QString::fromLatin1(XYTid::SOCKET_NAME));
+        }
+    }
+    connect(server_, &QLocalServer::newConnection, this, [this] {
+        while (QLocalSocket *socket = server_->nextPendingConnection())
+        {
+            connect(socket, &QLocalSocket::disconnected, socket, &QObject::deleteLater);
+            connect(socket, &QLocalSocket::readyRead, this, [this, socket] {
+                while (socket->canReadLine())
+                {
+                    socket->write(receiveHandoff(socket->readLine().trimmed()) + "\n");
+                    socket->flush();
+                }
+            });
+        }
+    });
+}
+
+QByteArray MainWindow::receiveHandoff(const QByteArray &line)
+{
+    auto handoff = XYTid::Handoff::fromString(line.toStdString());
+    if (!handoff)
+    {
+        return "ERROR";
+    }
+    if (controller_->isRunning())
+    {
+        return "BUSY";
+    }
+    const auto &list = RngTypes::consoles();
+    for (int i = 0; i < int(list.size()); i++)
+    {
+        if (list[size_t(i)].id == "3ds")
+        {
+            consoles_->setCurrentIndex(i); // selects the console's last type
+        }
+    }
+    for (int row = 0; row < types_->count(); row++)
+    {
+        if (types_->item(row)->data(Qt::UserRole).toString() == QLatin1String("xy-tid"))
+        {
+            types_->setCurrentRow(row);
+        }
+    }
+    XYTidPanel *xy = xyPanel();
+    if (!xy || !xy->load(*handoff))
+    {
+        return "ERROR";
+    }
+    startStop(); // the blink beeps start at once: you are on the professor's screen
+    raise();
+    activateWindow();
+    statusBar()->showMessage(
+        tr("From PokeFinderPlus: beeps on the professor's blinks. Faster/Slower until they match, then Space with A at each step."), 15000);
+    return "OK";
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

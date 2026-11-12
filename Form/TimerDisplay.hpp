@@ -21,6 +21,7 @@ public:
     void showProgress(int phase, double remaining, double next);
     void showContinuous(double elapsed, double toNext, int targetsLeft);
     void setMinutesBefore(int minutes); // -1 hides it
+    void showLabelled(const QString &label, double remaining, double elapsed); // XY TID
     void flash();
 
     static QString format(double ms); // "35.520", "∞", "1:05.200"

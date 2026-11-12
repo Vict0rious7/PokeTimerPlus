@@ -6,6 +6,7 @@
 #include "StoreTest.hpp"
 #include "ScheduleTest.hpp"
 #include "TimersTest.hpp"
+#include "XYTidTest.hpp"
 #include <QCoreApplication>
 #include <QTest>
 
@@ -27,6 +28,10 @@ int main(int argc, char *argv[])
     }
     {
         StoreTest test;
+        status |= QTest::qExec(&test, argc, argv);
+    }
+    {
+        XYTidTest test;
         status |= QTest::qExec(&test, argc, argv);
     }
     return status;

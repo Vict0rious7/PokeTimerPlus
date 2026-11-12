@@ -3,6 +3,7 @@
  */
 
 #include "TimerPanels.hpp"
+#include "XYTidPanel.hpp"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -863,6 +864,8 @@ TimerPanel *createPanel(const RngType &type)
         return new Gen5Panel;
     case TimerTemplate::Custom:
         return new CustomPanel;
+    case TimerTemplate::XYTid:
+        return new XYTidPanel;
     }
     return new CustomPanel;
 }

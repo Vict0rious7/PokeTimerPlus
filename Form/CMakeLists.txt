@@ -1,6 +1,6 @@
 project(PokeTimerPlusForm)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
 
 configure_file(AppVersion.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/AppVersion.hpp)
 
@@ -15,6 +15,8 @@ add_library(PokeTimerPlusForm STATIC
     TimerDisplay.hpp
     TimerPanels.cpp
     TimerPanels.hpp
+    XYTidPanel.cpp
+    XYTidPanel.hpp
 )
 
 qt_add_resources(PokeTimerPlusForm sounds
@@ -35,4 +37,4 @@ qt_add_resources(PokeTimerPlusForm icons
 )
 
 target_include_directories(PokeTimerPlusForm PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(PokeTimerPlusForm PUBLIC PokeTimerPlusCore Qt6::Widgets)
+target_link_libraries(PokeTimerPlusForm PUBLIC PokeTimerPlusCore Qt6::Widgets Qt6::Network)

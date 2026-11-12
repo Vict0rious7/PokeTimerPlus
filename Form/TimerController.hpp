@@ -48,6 +48,11 @@ public:
     void nudgeLastTarget(double deltaMs);
     const std::vector<double> &targets() const;
 
+    // External beeps (XY TID): the caller gives every beep time (system ms) and replaces them as it goes
+    void startExternal();
+    bool isExternal() const;
+    void setExternalBeeps(const std::vector<double> &absoluteMs);
+
     // Plays a short countdown now (settings "Test")
     void testBeeps();
 
@@ -59,6 +64,7 @@ signals:
     void progress(int phase, double remaining, double next, double elapsed);
     // continuous: time to the next target (NaN if none left), targets left
     void continuousProgress(double elapsed, double toNext, int targetsLeft);
+    void externalTick(double nowMs, double elapsed); // external mode, every tick
     void beep(); // for the visual cue
     void finished();
     void outputChanged(); // the system default output changed under us
@@ -71,6 +77,8 @@ private:
     AudioEngine engine_;
     std::unique_ptr<Schedule> schedule_;
     bool continuous_ = false;
+    bool external_ = false;
+    std::vector<double> externalBeeps_; // absolute ms
     std::vector<double> targets_; // continuous targets, ms from start
     QTimer *timer_;
     double startMs_ = 0;
