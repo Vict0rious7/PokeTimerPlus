@@ -40,7 +40,7 @@ jobs:
             qt-archives: icu qtbase
             env: { CC: gcc-14, CXX: g++-14 }
 
-          - os: macos-15
+          - os: macos-15-intel # arm64 runners were often not acquired (capacity, 2026-11); the build is universal anyway
             platform-name: macOS
             cache-key: macos
             qt-archives: qtbase
