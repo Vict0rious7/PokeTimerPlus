@@ -53,6 +53,14 @@ namespace RngTypes
             { "custom-ds", "ds", "Custom", TimerTemplate::Custom, "custom-ds", one },
             // 3DS
             { "xy-tid", "3ds", "XY TID", TimerTemplate::XYTid, "xy-tid", one },
+            { "crystal-vc-celebi",
+              "3ds",
+              "Crystal VC Celebi",
+              TimerTemplate::Custom,
+              "crystal-vc-celebi",
+              { { "", "",
+                  "Shiny GS Ball Celebi, Pokemon Crystal on the 3DS Virtual Console. Send the phases from PokeFinderPlus (Gen 2 -> "
+                  "Celebi). Start on the VC Reset confirm; your calibration (ms) is on the first phase." } } },
             { "custom-3ds", "3ds", "Custom", TimerTemplate::Custom, "custom-3ds", one },
             // Switch: custom until those games are covered
             { "custom-switch", "switch", "Custom", TimerTemplate::Custom, "custom-switch", one },

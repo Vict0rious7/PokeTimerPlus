@@ -59,6 +59,7 @@ private:
     XYTidPanel *xyPanel() const; // the current panel if it is XY TID
     void listen(); // PokeFinderPlus' "Send to PokeTimerPlus"
     QByteArray receiveHandoff(const QByteArray &line);
+    QByteArray receiveCelebi(const QByteArray &line); // PokeFinderPlus Gen 2 Celebi phases
     void calibrate();
     void setTarget();
     void finished();

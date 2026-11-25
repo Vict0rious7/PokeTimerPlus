@@ -737,6 +737,10 @@ void MainWindow::listen()
 
 QByteArray MainWindow::receiveHandoff(const QByteArray &line)
 {
+    if (line.startsWith("celebi "))
+    {
+        return receiveCelebi(line);
+    }
     auto handoff = XYTid::Handoff::fromString(line.toStdString());
     if (!handoff)
     {
@@ -767,6 +771,92 @@ QByteArray MainWindow::receiveHandoff(const QByteArray &line)
         return "ERROR";
     }
     startStop(); // the blink beeps start at once: you are on the professor's screen
+    raise();
+    activateWindow();
+    return "OK";
+}
+
+// PokeFinderPlus Gen 2 Celebi: "celebi plan=<name> lang=<xx> calibration=<ms> phases=<f1>,<f2>,..." with phases in GB frames
+// (59.8312 fps, the VC emulator's frame rate). The phases become Custom phases in ms, the calibration on the first one. The
+// timer is not started: the player starts it on the VC Reset confirm.
+QByteArray MainWindow::receiveCelebi(const QByteArray &line)
+{
+    constexpr double GBC_VC_FPS = 59.8312;
+    std::vector<int> frames;
+    int calibration = 0;
+    bool calOk = false;
+    QByteArray plan;
+    for (const QByteArray &part : line.split(' '))
+    {
+        int eq = part.indexOf('=');
+        if (eq < 0)
+        {
+            continue;
+        }
+        const QByteArray k = part.left(eq), v = part.mid(eq + 1);
+        if (k == "phases")
+        {
+            for (const QByteArray &f : v.split(','))
+            {
+                bool ok = false;
+                int n = f.toInt(&ok);
+                if (!ok || n <= 0 || n > 100000)
+                {
+                    return "ERROR";
+                }
+                frames.push_back(n);
+            }
+        }
+        else if (k == "calibration")
+        {
+            calibration = v.toInt(&calOk);
+        }
+        else if (k == "plan")
+        {
+            plan = v;
+        }
+    }
+    if (frames.empty() || frames.size() > 12 || !calOk)
+    {
+        return "ERROR";
+    }
+    if (controller_->isRunning())
+    {
+        return "BUSY";
+    }
+    const auto &list = RngTypes::consoles();
+    for (int i = 0; i < int(list.size()); i++)
+    {
+        if (list[size_t(i)].id == "3ds")
+        {
+            consoles_->setCurrentIndex(i);
+        }
+    }
+    for (int row = 0; row < types_->count(); row++)
+    {
+        if (types_->item(row)->data(Qt::UserRole).toString() == QLatin1String("crystal-vc-celebi"))
+        {
+            types_->setCurrentRow(row);
+        }
+    }
+    TimerPanel *p = panel();
+    auto *custom = p ? qobject_cast<CustomPanel *>(p->current()) : nullptr;
+    if (!custom || typeId_ != "crystal-vc-celebi")
+    {
+        return "ERROR";
+    }
+    std::vector<CustomPhase> phases;
+    for (size_t i = 0; i < frames.size(); i++)
+    {
+        phases.push_back({ CustomUnit::Milliseconds, int(std::lround(frames[i] * 1000.0 / GBC_VC_FPS)), i == 0 ? double(calibration) : 0.0 });
+    }
+    custom->setLayout(phases);
+    updatePreview();
+    updateSaveState();
+    statusBar()->showMessage(tr("Crystal VC Celebi: %1 phases from PokeFinderPlus (%2). Start on the VC Reset confirm.")
+                                 .arg(frames.size())
+                                 .arg(QString::fromLatin1(plan)),
+                             15000);
     raise();
     activateWindow();
     return "OK";
